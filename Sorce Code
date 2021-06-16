@@ -1,0 +1,145 @@
+Option Explicit
+
+'ワークシート上をレンズが移動する様子をVBAで実装してみた
+'コードはクラスを使わず標準モジュールにべた打ちした
+
+Private Const targetSheetName As String = "Sheet1"
+Private Const pngFileName As String = "temp.png"
+
+Sub MovingLensOnWorksheet()
+    
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Worksheets(targetSheetName)
+    
+    'ズームを100に固定化する（レンズの中の画像位置調整を簡単にするため）
+    ws.Activate
+    ActiveWindow.Zoom = 100
+    
+    'フォームコントロール以外の図形を消去する
+    Dim spTemp As Shape
+    For Each spTemp In ws.Shapes
+        If spTemp.Type <> msoFormControl Then spTemp.Delete
+    Next
+    
+    '使用されているセルの範囲をClipboardにコピーする
+    Dim rng As Range
+    Set rng = ws.Range(ws.Range("A1"), ws.Cells.SpecialCells(xlCellTypeLastCell))
+    rng.CopyPicture
+    DoEvents: DoEvents
+    
+    Application.ScreenUpdating = False
+    
+    'Clipboardのビトマップをファイルに出力する
+    Dim ch As ChartObject
+    Set ch = ws.ChartObjects.Add(rng.Left, rng.Top, rng.Width, rng.Height)
+    ch.Select
+    ch.Chart.Paste
+    DoEvents: DoEvents
+    ch.Chart.Export ThisWorkbook.Path & "\" & pngFileName
+    ch.Delete
+    Application.ScreenUpdating = True
+    
+    '開始位置とレンズのサイズ
+    Dim lensX As Single, lensY As Single, lensSize As Single
+    lensX = 10
+    lensY = 10
+    lensSize = 120
+
+    '最初の位置にレンズを描く
+    Dim sLens As Shape
+    Set sLens = ws.Shapes.AddShape(msoShapeOval, lensX, lensY, 120, 120)
+    sLens.Line.Visible = msoFalse
+    
+    'レンズの中に画像を挿入する
+    With sLens.Fill
+        .UserPicture ThisWorkbook.Path & "\" & pngFileName
+        .Visible = msoTrue
+        .TextureHorizontalScale = 1
+        .TextureVerticalScale = 1
+        .TextureOffsetX = -lensX
+        .TextureOffsetY = -lensY
+    End With
+
+    Dim offsetX As Long, offsetY As Long
+    offsetX = 0
+    offsetY = 0
+
+    '移動速度 msec/pixel
+    Dim speed As Long
+    speed = 10
+ 
+    '拡大率(%)
+    Dim mRatio As Long
+    mRatio = 100
+    
+    '調整値（補正値） レンズらしく見せるための調整値
+    Dim cv As Single
+    cv = 62
+    
+    'レンズの倍率を上げる
+    For mRatio = 100 To 130
+        With sLens.Fill
+            .TextureHorizontalScale = mRatio / 100
+            .TextureVerticalScale = mRatio / 100
+            .TextureOffsetX = -(lensX + offsetX) * mRatio / 100 - cv * (mRatio - 100) / 100
+            .TextureOffsetY = -(lensY + offsetY) * mRatio / 100 - cv * (mRatio - 100) / 100
+        End With
+        Application.Wait [NOW()] + speed / 86400000
+    Next
+    
+    mRatio = 130
+
+    'レンズを右に移動
+
+    For offsetX = 0 To 200
+        sLens.Left = lensX + offsetX
+        sLens.Fill.TextureOffsetX = -(lensX + offsetX) * mRatio / 100 - cv * (mRatio - 100) / 100
+        Application.Wait [NOW()] + speed / 86400000
+    Next
+    
+    'レンズを下に移動
+    For offsetY = 0 To 30
+        sLens.Top = lensY + offsetY
+        sLens.Fill.TextureOffsetY = -(lensY + offsetY) * mRatio / 100 - cv * (mRatio - 100) / 100
+        Application.Wait [NOW()] + speed / 86400000
+    Next
+    
+    'レンズを左に移動
+    For offsetX = 200 To 0 Step -1
+        sLens.Left = lensX + offsetX
+        sLens.Fill.TextureOffsetX = -(lensX + offsetX) * mRatio / 100 - cv * (mRatio - 100) / 100
+        Application.Wait [NOW()] + speed / 86400000
+    Next
+    
+    'レンズを下に移動
+    For offsetY = 30 To 60
+        sLens.Top = lensY + offsetY
+        sLens.Fill.TextureOffsetY = -(lensY + offsetY) * mRatio / 100 - cv * (mRatio - 100) / 100
+        Application.Wait [NOW()] + speed / 86400000
+    Next
+
+    'レンズを右に移動
+    For offsetX = 0 To 200
+        sLens.Left = lensX + offsetX
+        sLens.Fill.TextureOffsetX = -(lensX + offsetX) * mRatio / 100 - cv * (mRatio - 100) / 100
+        Application.Wait [NOW()] + speed / 86400000
+    Next
+
+    offsetX = 200
+    offsetY = 60
+
+    'レンズの倍率を下げる
+    For mRatio = 130 To 100 Step -1
+        With sLens.Fill
+            .TextureHorizontalScale = mRatio / 100
+            .TextureVerticalScale = mRatio / 100
+            .TextureOffsetX = -(lensX + offsetX) * mRatio / 100 - cv * (mRatio - 100) / 100
+            .TextureOffsetY = -(lensY + offsetY) * mRatio / 100 - cv * (mRatio - 100) / 100
+        End With
+        Application.Wait [NOW()] + speed / 86400000
+    Next
+   
+   'レンズを消去する
+    sLens.Delete
+    
+End Sub
